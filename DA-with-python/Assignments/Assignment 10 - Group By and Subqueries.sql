@@ -18,7 +18,13 @@
 -- ============================================================
 
 -- Write your query below:
-
+SELECT
+    COUNT(*) AS total_order_lines,
+    SUM(quantity) AS total_units_sold,
+    AVG(list_price) AS average_list_price,
+    MIN(list_price) AS minimum_list_price,
+    MAX(list_price) AS maximum_list_price
+FROM sales.order_items;
 
 
 
@@ -33,15 +39,25 @@
 -- ============================================================
 
 -- Part a:
+SELECT COUNT(*) AS total_customers
+FROM sales.customers;
 
 
 -- Part b:
+SELECT
+    COUNT(email) AS customers_with_email,
+    COUNT(phone) AS customers_with_phone
+FROM sales.customers;
 
 
 -- Part c:
+SELECT
+    COUNT(*) - COUNT(phone) AS customers_without_phone
+FROM sales.customers;
 
-
-
+SELECT COUNT(*) AS customers_without_phone
+FROM sales.customers
+WHERE phone IS NULL;
 
 -- ============================================================
 --  Question 3 — GROUP BY
@@ -54,13 +70,30 @@
 -- ============================================================
 
 -- Part a:
-
+SELECT
+    product_id,
+    SUM(quantity) AS total_units_sold
+FROM sales.order_items
+GROUP BY product_id
+ORDER BY total_units_sold DESC;
 
 -- Part b:
-
+SELECT
+    state,
+    COUNT(*) AS customer_count
+FROM sales.customers
+GROUP BY state
+ORDER BY customer_count DESC;
 
 -- Part c:
-
+SELECT
+    staff_id,
+    order_status,
+    COUNT(*) AS order_count
+FROM sales.orders
+GROUP BY
+    staff_id,
+    order_status;
 
 
 
@@ -79,13 +112,47 @@
 -- ============================================================
 
 -- Part a:
-
+SELECT
+    c.category_name,
+    ROUND(AVG(p.list_price), 2) AS average_list_price
+FROM production.products AS p
+INNER JOIN production.categories AS c
+    ON p.category_id = c.category_id
+GROUP BY c.category_name;
 
 -- Part b:
-
+SELECT
+    b.brand_name,
+    COUNT(p.product_id) AS product_count
+FROM production.brands AS b
+INNER JOIN production.products AS p
+    ON b.brand_id = p.brand_id
+GROUP BY b.brand_name
+ORDER BY product_count DESC;
 
 -- Part c:
-
+SELECT
+    c.customer_id,
+    c.first_name,
+    c.last_name,
+    COUNT(DISTINCT o.order_id) AS order_count,
+    COALESCE(
+        SUM(
+            oi.quantity
+            * oi.list_price
+            * (1 - oi.discount)
+        ),
+        0
+    ) AS total_spent
+FROM sales.customers AS c
+LEFT JOIN sales.orders AS o
+    ON c.customer_id = o.customer_id
+LEFT JOIN sales.order_items AS oi
+    ON o.order_id = oi.order_id
+GROUP BY
+    c.customer_id,
+    c.first_name,
+    c.last_name;
 
 
 
@@ -102,16 +169,34 @@
 -- ============================================================
 
 -- Part a:
-
+SELECT
+    model_year,
+    COUNT(*) AS product_count
+FROM production.products
+GROUP BY model_year
+HAVING COUNT(*) > 50;
 
 -- Part b:
-
+SELECT
+    customer_id,
+    COUNT(*) AS order_count
+FROM sales.orders
+GROUP BY customer_id
+HAVING COUNT(*) >= 2;
 
 -- Part c:
-
+SELECT
+    product_id,
+    SUM(quantity) AS total_units_sold
+FROM sales.order_items
+GROUP BY product_id
+HAVING SUM(quantity) > 100;
 
 -- Part d (answer as a comment):
-
+-- WHERE filters individual rows before GROUP BY.
+-- HAVING filters groups after GROUP BY.
+-- Part (a) needs HAVING because COUNT(*) is calculated
+-- after the rows are grouped by model_year.
 
 
 
@@ -125,7 +210,24 @@
 -- ============================================================
 
 -- Write your query below:
-
+SELECT
+    o.store_id,
+    SUM(
+        oi.quantity
+        * oi.list_price
+        * (1 - oi.discount)
+    ) AS total_revenue
+FROM sales.orders AS o
+INNER JOIN sales.order_items AS oi
+    ON o.order_id = oi.order_id
+WHERE YEAR(o.order_date) = 2017
+GROUP BY o.store_id
+HAVING SUM(
+    oi.quantity
+    * oi.list_price
+    * (1 - oi.discount)
+) > 100000
+ORDER BY total_revenue DESC;
 
 
 
@@ -141,13 +243,42 @@
 -- ============================================================
 
 -- Part a:
-
+SELECT *
+FROM sales.orders
+WHERE customer_id IN
+(
+    SELECT customer_id
+    FROM sales.customers
+    WHERE city = 'New York'
+);
 
 -- Part b:
-
+SELECT
+    product_id,
+    product_name
+FROM production.products
+WHERE category_id IN
+(
+    SELECT category_id
+    FROM production.categories
+    WHERE category_name IN
+    (
+        'Electric Bikes',
+        'Cruisers Bicycles'
+    )
+);
 
 -- Part c:
-
+SELECT
+    first_name,
+    last_name,
+    city
+FROM sales.customers
+WHERE customer_id IN
+(
+    SELECT customer_id
+    FROM sales.orders
+);
 
 
 
@@ -167,16 +298,61 @@
 -- ============================================================
 
 -- Part a:
-
+SELECT
+    product_id,
+    product_name,
+    list_price
+FROM production.products
+WHERE list_price >
+(
+    SELECT AVG(list_price)
+    FROM production.products
+);
 
 -- Part b:
+SELECT
+    product_id,
+    product_name,
+    list_price
+FROM production.products
+WHERE list_price <
+(
+    SELECT AVG(list_price)
+    FROM production.products
+);
 
-
+SELECT
+    COUNT(*) AS products_below_average
+FROM production.products
+WHERE list_price <
+(
+    SELECT AVG(list_price)
+    FROM production.products
+);
 -- Part c:
-
+SELECT
+    customer_id,
+    first_name,
+    last_name
+FROM sales.customers
+WHERE customer_id NOT IN
+(
+    SELECT customer_id
+    FROM sales.orders
+    WHERE customer_id IS NOT NULL
+);
 
 -- Part d:
-
+SELECT
+    product_id,
+    product_name
+FROM production.products
+WHERE product_id NOT IN
+(
+    SELECT product_id
+    FROM sales.order_items
+    WHERE product_id IS NOT NULL
+);
 
 
 
@@ -192,10 +368,36 @@
 -- ============================================================
 
 -- Part a:
-
+SELECT
+    AVG(order_count) AS average_orders,
+    MIN(order_count) AS minimum_orders,
+    MAX(order_count) AS maximum_orders
+FROM
+(
+    SELECT
+        staff_id,
+        COUNT(*) AS order_count
+    FROM sales.orders
+    GROUP BY staff_id
+) AS staff_orders;
 
 -- Part b:
-
+SELECT
+    AVG(total_spent) AS average_total_spent
+FROM
+(
+    SELECT
+        o.customer_id,
+        SUM(
+            oi.quantity
+            * oi.list_price
+            * (1 - oi.discount)
+        ) AS total_spent
+    FROM sales.orders AS o
+    INNER JOIN sales.order_items AS oi
+        ON o.order_id = oi.order_id
+    GROUP BY o.customer_id
+) AS customer_spending;
 
 
 
@@ -213,13 +415,51 @@
 -- ============================================================
 
 -- Part a:
+SELECT
+    p.product_id,
+    p.product_name,
+    p.list_price,
 
+    (
+        SELECT SUM(oi.quantity)
+        FROM sales.order_items AS oi
+        WHERE oi.product_id = p.product_id
+    ) AS units_sold
+
+FROM production.products AS p;
 
 -- Part b:
+SELECT
+    o.order_id,
+    o.order_date,
 
+    (
+        SELECT COUNT(*)
+        FROM sales.order_items AS oi
+        WHERE oi.order_id = o.order_id
+    ) AS item_count,
+
+    (
+        SELECT MAX(oi.list_price)
+        FROM sales.order_items AS oi
+        WHERE oi.order_id = o.order_id
+    ) AS max_item_price
+
+FROM sales.orders AS o;
 
 -- Part c:
+SELECT
+    product_id,
+    product_name,
+    list_price,
 
+    list_price -
+    (
+        SELECT AVG(list_price)
+        FROM production.products
+    ) AS price_difference
+
+FROM production.products;
 
 
 
@@ -234,3 +474,57 @@
 -- ============================================================
 
 -- Write your query below:
+SELECT
+    c.customer_id,
+    c.first_name,
+    c.last_name,
+
+    SUM(
+        oi.quantity
+        * oi.list_price
+        * (1 - oi.discount)
+    ) AS total_spent
+
+FROM sales.customers AS c
+
+INNER JOIN sales.orders AS o
+    ON c.customer_id = o.customer_id
+
+INNER JOIN sales.order_items AS oi
+    ON o.order_id = oi.order_id
+
+GROUP BY
+    c.customer_id,
+    c.first_name,
+    c.last_name
+
+HAVING
+    SUM(
+        oi.quantity
+        * oi.list_price
+        * (1 - oi.discount)
+    )
+    >
+    (
+        SELECT AVG(customer_total)
+        FROM
+        (
+            SELECT
+                o2.customer_id,
+
+                SUM(
+                    oi2.quantity
+                    * oi2.list_price
+                    * (1 - oi2.discount)
+                ) AS customer_total
+
+            FROM sales.orders AS o2
+
+            INNER JOIN sales.order_items AS oi2
+                ON o2.order_id = oi2.order_id
+
+            GROUP BY o2.customer_id
+        ) AS customer_totals
+    )
+
+ORDER BY total_spent DESC;
